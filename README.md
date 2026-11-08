@@ -14,7 +14,7 @@ It depends on the C++17 standard library only: no engine, graphics API, Windows 
 | `GoldSrcRenderBSPTypes.h` | `BSPLayout`, `DetailTextureBinding`, `BSPAssetView` |
 | `GoldSrcRenderMDLTypes.h` | `StudioShadingParams`, `StudioShadingOverrides`, `StudioMaterial`, `MDLAssetView` |
 | `GoldSrcRenderAssetUtil.h` | Asset limits, bounded readers and `ValidateBSPAsset` / `ValidateMDLAsset` |
-| `GoldSrcRenderBSP.h` | `ValidateBSPFile`, `BuildBSPWorld`, texture animation and scrolling, leaves and visible surfaces |
+| `GoldSrcRenderBSP.h` | `ValidateBSPFile`, `BuildBSPWorld`, texture animation and scrolling, leaves, visible leaves and surfaces |
 | `GoldSrcRenderMDL.h` | `ValidateMDLFile`, `ValidateMDLTextureFile`, `BuildMDLModel`, `ResolveMDLTexture`, `ParseMDLPackedTextureName` |
 
 The `*View` types borrow their arrays and strings for the duration of a call. Every type that crosses a module

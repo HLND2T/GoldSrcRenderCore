@@ -359,10 +359,13 @@ float GetBSPSubmodelCameraDistance(const BSPSubmodel& submodel, const Matrix4& t
 //Leaf containing origin, following the world tree; BSPSolidLeaf when origin is in solid space.
 std::uint32_t FindBSPLeaf(const BSPWorld& world, const Vector3& origin);
 
-//Marks the surfaces visible from leaf, following GoldSrc: a surface is visible when a leaf in the leaf's PVS lists
-//it and the node owning it is an ancestor of such a leaf. BSPSolidLeaf, or a file without visibility, sees every
-//world leaf. visibleSurfaces receives one flag per surface and visibleWaterSurfaces one per water surface; only those
-//of submodel 0 can be visible.
+//Marks the leaves visible from leaf, its PVS: visibleLeaves receives one flag per leaf of the world tree. BSPSolidLeaf,
+//or a file without visibility, sees every world leaf; the solid leaf itself is never visible.
+void FindBSPVisibleLeaves(const BSPWorld& world, std::uint32_t leaf, std::vector<std::uint8_t>& visibleLeaves);
+
+//Marks the surfaces visible from leaf, following GoldSrc: a surface is visible when a leaf FindBSPVisibleLeaves marks
+//lists it and the node owning it is an ancestor of such a leaf. visibleSurfaces receives one flag per surface and
+//visibleWaterSurfaces one per water surface; only those of submodel 0 can be visible.
 void FindBSPVisibleSurfaces(const BSPWorld& world, std::uint32_t leaf, std::vector<std::uint8_t>& visibleSurfaces, std::vector<std::uint8_t>& visibleWaterSurfaces);
 } // namespace GoldSrcRender
 

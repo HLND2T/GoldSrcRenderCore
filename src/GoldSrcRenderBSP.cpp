@@ -1888,24 +1888,33 @@ std::uint32_t FindBSPLeaf(const BSPWorld& world, const Vector3& origin)
     return static_cast<std::uint32_t>(-1 - child);
 }
 
+void FindBSPVisibleLeaves(const BSPWorld& world, std::uint32_t leaf, std::vector<std::uint8_t>& visibleLeaves)
+{
+    const auto leafCount = static_cast<std::uint32_t>(world.leaves.size());
+
+    visibleLeaves.assign(leafCount, 0);
+
+    if (leaf == BSPSolidLeaf || leaf >= leafCount || world.leaves[leaf].visibilityOffset == BSPAbsentOffset)
+    {
+        std::fill(visibleLeaves.begin() + std::min<std::uint32_t>(1, leafCount), visibleLeaves.end(), 1);
+        return;
+    }
+
+    std::vector<std::uint8_t> row(VisibilityRowBytes(world.visibleLeafCount));
+
+    //The row was checked when the world was built.
+    DecodeVisibilityRow(world.visibility.data(), world.visibility.size(), world.leaves[leaf].visibilityOffset, static_cast<std::uint32_t>(row.size()), row.data());
+
+    for (std::uint32_t i = 0; i < world.visibleLeafCount && i + 1 < leafCount; ++i)
+        visibleLeaves[i + 1] = (row[i / BSPVisibilityBitsPerByte] >> (i % BSPVisibilityBitsPerByte)) & 1;
+}
+
 void FindBSPVisibleSurfaces(const BSPWorld& world, std::uint32_t leaf, std::vector<std::uint8_t>& visibleSurfaces, std::vector<std::uint8_t>& visibleWaterSurfaces)
 {
     const auto leafCount = static_cast<std::uint32_t>(world.leaves.size());
 
-    std::vector<std::uint8_t> visibleLeaves(leafCount);
-
-    if (leaf == BSPSolidLeaf || leaf >= leafCount || world.leaves[leaf].visibilityOffset == BSPAbsentOffset)
-        std::fill(visibleLeaves.begin() + std::min<std::uint32_t>(1, leafCount), visibleLeaves.end(), 1);
-    else
-    {
-        std::vector<std::uint8_t> row(VisibilityRowBytes(world.visibleLeafCount));
-
-        //The row was checked when the world was built.
-        DecodeVisibilityRow(world.visibility.data(), world.visibility.size(), world.leaves[leaf].visibilityOffset, static_cast<std::uint32_t>(row.size()), row.data());
-
-        for (std::uint32_t i = 0; i < world.visibleLeafCount && i + 1 < leafCount; ++i)
-            visibleLeaves[i + 1] = (row[i / BSPVisibilityBitsPerByte] >> (i % BSPVisibilityBitsPerByte)) & 1;
-    }
+    std::vector<std::uint8_t> visibleLeaves;
+    FindBSPVisibleLeaves(world, leaf, visibleLeaves);
 
     //A visible leaf makes its ancestors visible; a face is drawn by the node owning it.
     std::vector<std::uint8_t> visibleNodes(world.nodes.size());
