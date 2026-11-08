@@ -45,6 +45,24 @@ static std::uint32_t CountVisible(const BSPWorld& world, std::uint32_t leaf)
     return static_cast<std::uint32_t>(std::count(visible.begin(), visible.end(), 1));
 }
 
+//The leaves visible from leaf, one flag per leaf, as a list of their numbers.
+static std::vector<std::uint32_t> ListVisibleLeaves(const BSPWorld& world, std::uint32_t leaf)
+{
+    std::vector<std::uint8_t> visible;
+    FindBSPVisibleLeaves(world, leaf, visible);
+
+    Require(visible.size() == world.leaves.size(), "one visibility flag per leaf");
+
+    std::vector<std::uint32_t> leaves;
+    for (std::uint32_t i = 0; i < visible.size(); ++i)
+    {
+        if (visible[i])
+            leaves.push_back(i);
+    }
+
+    return leaves;
+}
+
 static std::uint32_t CountVisibleWater(const BSPWorld& world, std::uint32_t leaf)
 {
     std::vector<std::uint8_t> visible;
@@ -215,6 +233,12 @@ static void TestBSPWorldBuild()
     Require(CountVisible(world, BSPSolidLeaf) == 5, "the solid leaf sees everything");
     Require(CountVisibleWater(world, 1) == 1 && CountVisibleWater(world, 2) == 0 && CountVisibleWater(world, BSPSolidLeaf) == 1, "water follows the same visibility");
 
+    const std::vector<std::uint32_t> firstLeaf{1};
+    const std::vector<std::uint32_t> secondLeaf{2};
+    const std::vector<std::uint32_t> everyLeaf{1, 2};
+    Require(ListVisibleLeaves(world, 1) == firstLeaf && ListVisibleLeaves(world, 2) == secondLeaf, "each leaf sees the leaves of its row");
+    Require(ListVisibleLeaves(world, BSPSolidLeaf) == everyLeaf, "the solid leaf sees every world leaf but itself");
+
     lumps = MakeTestBSPLumps();
     lumps[BSPVisibilityLump].clear();
     lumps[BSPLightingLump].clear();
@@ -223,6 +247,7 @@ static void TestBSPWorldBuild()
     Require(BuildBSPWorld(TestBSPAsset(unlit, bindings), world) == ErrorCode::None && world.bFullbright && !world.usedStyleLayers, "a world without lighting is fully bright");
     Require(world.lightmapPages && std::all_of(world.lightmaps.begin(), world.lightmaps.end(), [](const std::vector<std::uint8_t>& layer) { return layer.empty(); }), "a fully bright world keeps its pages but allocates no layer");
     Require(CountVisible(world, 2) == 5, "without visibility every leaf sees everything");
+    Require(ListVisibleLeaves(world, 2) == everyLeaf, "without visibility every leaf sees every world leaf");
 
     //Unbound textures are missing, except sky, which stays skipped.
     Require(BuildBSPWorld(TestBSPAsset(file, unbound), world) == ErrorCode::None, "build without bindings");
