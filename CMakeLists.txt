@@ -29,11 +29,26 @@ target_compile_features(GoldSrcRenderCore PUBLIC cxx_std_17)
 target_include_directories(GoldSrcRenderCore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 set_target_properties(GoldSrcRenderCore PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+file(GLOB_RECURSE core_headers CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/include/*.inl")
+target_sources(GoldSrcRenderCore PRIVATE ${core_headers})
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Header Files" FILES ${core_headers})
+
 # Generated BSP and MDL test files and the helpers that compare what they build, for the tests of every project
 # reading these assets.
 add_library(GoldSrcRenderCoreTestFiles INTERFACE)
 target_include_directories(GoldSrcRenderCoreTestFiles INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/tests")
 target_link_libraries(GoldSrcRenderCoreTestFiles INTERFACE GoldSrcRenderCore)
+
+# Private sources make this header-only target visible in IDEs without propagating files to consumers.
+file(GLOB_RECURSE test_headers CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.inl")
+target_sources(GoldSrcRenderCoreTestFiles PRIVATE ${test_headers})
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Header Files" FILES ${test_headers})
 
 if(GOLDSRCRENDERCORE_BUILD_TESTS)
   enable_testing()
