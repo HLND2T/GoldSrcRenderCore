@@ -1257,7 +1257,8 @@ struct BSPPendingSurface
     BSPTextureAnimation alternateAnimation;
 };
 
-//The normal and texture axes every vertex of a face has, turned around for faces on the back of their plane.
+//The normal and texture axes every vertex of a face has. The side selects the normal; texture axes retain the
+//directions of the unchanged texinfo UV mapping, including its handedness.
 struct BSPFaceFrame
 {
     Vector3 normal;
@@ -1273,11 +1274,7 @@ static BSPFaceFrame ReadFaceFrame(const BSPFileView& file, const BSPFace& face, 
     frame.tTangent = Normalize({texInfo.vectors[1][0], texInfo.vectors[1][1], texInfo.vectors[1][2]});
 
     if (face.bBack)
-    {
-        frame.normal   = Negate(frame.normal);
-        frame.sTangent = Negate(frame.sTangent);
-        frame.tTangent = Negate(frame.tTangent);
-    }
+        frame.normal = Negate(frame.normal);
 
     return frame;
 }
