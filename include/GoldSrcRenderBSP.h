@@ -191,7 +191,8 @@ struct BSPWaterGroup
 //for faces that are not drawn as surfaces (sky, degenerate and water faces), and for a surface the texinfo
 //axes and lightmap placement that give its lightmap coordinates (see GetBSPFaceLightmapTexcoord). waterSurface is the
 //entry of BSPWorld::waterSurfaces built from a water face, or BSPNoSurface. The normal and texture axes are those of
-//the face's vertices (turned around for faces on the back of their plane), for every face.
+//the face's vertices, for every face: only the normal turns around for the back of a plane. Texture axes retain the
+//texinfo UV directions and handedness, independently of the face side.
 struct BSPWorldFace
 {
     std::uint32_t surface{BSPNoSurface};
