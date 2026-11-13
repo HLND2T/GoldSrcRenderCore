@@ -678,7 +678,7 @@ static Vector3 FaceUVDirection(const Vector3& start, const Vector3& end, float u
     return {derivative.x / length, derivative.y / length, derivative.z / length};
 }
 
-static bool AlignedFaceDirection(const Vector3& expected, const Vector3& actual)
+static bool IsAlignedFaceDirection(const Vector3& expected, const Vector3& actual)
 {
     constexpr float tolerance     = 0.00001f;
     const float     alignment     = expected.x * actual.x + expected.y * actual.y + expected.z * actual.z;
@@ -686,70 +686,102 @@ static bool AlignedFaceDirection(const Vector3& expected, const Vector3& actual)
     return alignment > 1 - tolerance && std::abs(lengthSquared - 1) < tolerance;
 }
 
+static Vector3 Scale(const Vector3& vector, float scale)
+{
+    return {vector.x * scale, vector.y * scale, vector.z * scale};
+}
+
+static Vector3 Add(const Vector3& a, const Vector3& b)
+{
+    return {a.x + b.x, a.y + b.y, a.z + b.z};
+}
+
+//An actual face normal and the texture axes along which the floor quad of TestBSPFaceFrames is generated.
+struct TestBSPFaceOrientation
+{
+    Vector3 normal;
+    Vector3 sAxis;
+    Vector3 tAxis;
+};
+
+//The test BSP with its floor face spanning sAxis and tAxis, stored on the given side of its plane so that its actual
+//normal stays orientation.normal. Every texinfo maps s along sAxis and t along tAxis times tSign.
+static std::vector<std::uint8_t> MakeOrientedFloorBSP(const TestBSPFaceOrientation& orientation, std::uint16_t side, float tSign)
+{
+    auto lumps = MakeTestBSPLumps();
+
+    const float planeSign = side ? -1.0f : 1.0f;
+    CBSPWriter  plane;
+    plane.Vector(Scale(orientation.normal, planeSign));
+    plane.Float(0);
+    plane.Int32(TestBSPPlaneAnyX);
+    std::copy(plane.Bytes().begin(), plane.Bytes().end(), lumps[BSPPlaneLump].begin());
+    PatchUInt16(lumps[BSPFaceLump], TestBSPFaceSideOffset, side);
+
+    constexpr float quadSize = TestBSPQuadSize;
+    const auto      sEdge    = Scale(orientation.sAxis, quadSize);
+    const auto      tEdge    = Scale(orientation.tAxis, quadSize);
+    CBSPWriter      vertices;
+    vertices.Vector(0, 0, 0);
+    vertices.Vector(sEdge);
+    vertices.Vector(Add(sEdge, tEdge));
+    vertices.Vector(tEdge);
+    lumps[BSPVertexLump] = vertices.Bytes();
+
+    CBSPWriter texInfos;
+    for (std::uint32_t slot = 0; slot < TestBSPMiptexCount; ++slot)
+    {
+        texInfos.Vector(orientation.sAxis);
+        texInfos.Float(0);
+        texInfos.Vector(Scale(orientation.tAxis, tSign));
+        texInfos.Float(0);
+        texInfos.Int32(static_cast<std::int32_t>(slot));
+        const bool bSpecial = slot == TestBSPSkySlot || slot == TestBSPWaterSlot || slot == TestBSPTriggerSlot;
+        texInfos.Int32(bSpecial ? TestBSPSpecialFlag : 0);
+    }
+    lumps[BSPTexInfoLump] = texInfos.Bytes();
+
+    return AssembleTestBSP(lumps);
+}
+
 //Six actual normal directions, each stored as either side of its BSP plane, with both UV handednesses. Keeping the
 //expected derivatives independent of both face and vertex frames catches the same wrong sign shared by the two.
 static void TestBSPFaceFrames()
 {
-    const Vector3           normals[]         = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
-    const Vector3           sAxes[]           = {{0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, 1}, {1, 0, 0}, {1, 0, 0}};
-    const Vector3           tAxes[]           = {{0, 0, 1}, {0, 0, 1}, {1, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 1, 0}};
-    constexpr std::uint32_t faceSideOffset    = 2;
-    constexpr std::int32_t  nonAxialPlaneType = 3;
+    const TestBSPFaceOrientation orientations[] = {
+        {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},
+        {{-1, 0, 0}, {0, 1, 0}, {0, 0, 1}},
+        {{0, 1, 0}, {0, 0, 1}, {1, 0, 0}},
+        {{0, -1, 0}, {0, 0, 1}, {1, 0, 0}},
+        {{0, 0, 1}, {1, 0, 0}, {0, 1, 0}},
+        {{0, 0, -1}, {1, 0, 0}, {0, 1, 0}}};
 
-    for (std::size_t direction = 0; direction < std::size(normals); ++direction)
+    for (const auto& orientation : orientations)
     {
-        const auto& normal = normals[direction];
-        const auto& sAxis  = sAxes[direction];
-        const auto& tAxis  = tAxes[direction];
         for (const std::uint16_t side : {std::uint16_t{0}, std::uint16_t{1}})
         {
             for (const float tSign : {1.0f, -1.0f})
             {
-                auto        lumps     = MakeTestBSPLumps();
-                const float planeSign = side ? -1.0f : 1.0f;
-                CBSPWriter  plane;
-                plane.Vector(normal.x * planeSign, normal.y * planeSign, normal.z * planeSign);
-                plane.Float(0);
-                plane.Int32(nonAxialPlaneType);
-                std::copy(plane.Bytes().begin(), plane.Bytes().end(), lumps[BSPPlaneLump].begin());
-                PatchUInt16(lumps[BSPFaceLump], faceSideOffset, side);
-
-                CBSPWriter vertices;
-                vertices.Vector(0, 0, 0);
-                vertices.Vector(sAxis.x * TestBSPQuadSize, sAxis.y * TestBSPQuadSize, sAxis.z * TestBSPQuadSize);
-                vertices.Vector((sAxis.x + tAxis.x) * TestBSPQuadSize, (sAxis.y + tAxis.y) * TestBSPQuadSize, (sAxis.z + tAxis.z) * TestBSPQuadSize);
-                vertices.Vector(tAxis.x * TestBSPQuadSize, tAxis.y * TestBSPQuadSize, tAxis.z * TestBSPQuadSize);
-                lumps[BSPVertexLump] = vertices.Bytes();
-
-                CBSPWriter texInfos;
-                for (std::uint32_t slot = 0; slot < TestBSPMiptexCount; ++slot)
-                {
-                    texInfos.Vector(sAxis.x, sAxis.y, sAxis.z);
-                    texInfos.Float(0);
-                    texInfos.Vector(tAxis.x * tSign, tAxis.y * tSign, tAxis.z * tSign);
-                    texInfos.Float(0);
-                    texInfos.Int32(static_cast<std::int32_t>(slot));
-                    const bool bSpecial = slot == TestBSPSkySlot || slot == TestBSPWaterSlot || slot == TestBSPTriggerSlot;
-                    texInfos.Int32(bSpecial ? TestBSPSpecialFlag : 0);
-                }
-                lumps[BSPTexInfoLump] = texInfos.Bytes();
-
-                const auto bytes = AssembleTestBSP(lumps);
+                const auto bytes = MakeOrientedFloorBSP(orientation, side, tSign);
                 BSPWorld   world;
                 Require(ErrorCode::None == BuildBSPWorld(TestBSPAsset(bytes, MakeTestBSPBindings(1)), world), "build the oriented face frame fixture");
                 const auto* pFace = FindBSPSubmodelFace(world, 0, TestBSPFloorFace);
                 Require(pFace && pFace->surface != BSPNoSurface, "the oriented floor is drawn");
+
                 const auto& surface   = world.surfaces[pFace->surface];
                 const auto  first     = world.indices[surface.firstIndex];
                 const auto  expectedS = FaceUVDirection(world.positions[first], world.positions[first + 1], world.texcoords[first + 1].x - world.texcoords[first].x);
                 const auto  expectedT = FaceUVDirection(world.positions[first + 1], world.positions[first + 2], world.texcoords[first + 2].y - world.texcoords[first + 1].y);
-                Require(SameVector(normal, pFace->normal), "side chooses the actual face normal");
-                Require(AlignedFaceDirection(expectedS, pFace->sTangent) && AlignedFaceDirection(expectedT, pFace->tTangent), "face texture axes follow its actual UV derivatives on either side");
+                Require(SameVector(orientation.normal, pFace->normal), "side chooses the actual face normal");
+                Require(IsAlignedFaceDirection(expectedS, pFace->sTangent), "face s axis follows its actual U derivative on either side");
+                Require(IsAlignedFaceDirection(expectedT, pFace->tTangent), "face t axis follows its actual V derivative on either side");
+
                 for (std::uint32_t i = 0; i < surface.indexCount; ++i)
                 {
                     const auto vertex = world.indices[surface.firstIndex + i];
-                    Require(SameVector(normal, world.normals[vertex]), "vertex normals follow the face side");
-                    Require(AlignedFaceDirection(expectedS, world.sTangents[vertex]) && AlignedFaceDirection(expectedT, world.tTangents[vertex]), "vertex texture axes follow actual UV derivatives on either side");
+                    Require(SameVector(orientation.normal, world.normals[vertex]), "vertex normals follow the face side");
+                    Require(IsAlignedFaceDirection(expectedS, world.sTangents[vertex]), "vertex s axes follow the actual U derivative on either side");
+                    Require(IsAlignedFaceDirection(expectedT, world.tTangents[vertex]), "vertex t axes follow the actual V derivative on either side");
                 }
             }
         }
