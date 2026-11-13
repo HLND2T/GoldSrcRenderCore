@@ -81,6 +81,7 @@ constexpr std::uint32_t TestBSPFaceBytes       = 20;
 constexpr std::uint32_t TestBSPTexInfoBytes    = 40;
 constexpr std::uint32_t TestBSPNodeBytes       = 24;
 constexpr std::uint32_t TestBSPLeafBytes       = 28;
+constexpr std::uint32_t TestBSPFaceSideOffset  = 2;
 constexpr std::uint32_t TestBSPFaceEdgesOffset = 8;
 constexpr std::uint32_t TestBSPFaceInfoOffset  = 10;
 constexpr std::uint32_t TestBSPFaceStyleOffset = 12;
@@ -88,6 +89,12 @@ constexpr std::uint32_t TestBSPFaceLightOffset = 16;
 constexpr std::uint32_t TestBSPNodeChildOffset = 4;
 constexpr std::uint32_t TestBSPLeafVisOffset   = 4;
 constexpr std::uint32_t TestBSPPlaneBytes      = 20;
+
+//GoldSrc plane types: PLANE_X and PLANE_Z have the x or z axis as their normal, PLANE_ANYX is the first type of a
+//plane whose normal is not an axis. Only PLANE_Z planes are read differently (horizontal water).
+constexpr std::int32_t TestBSPPlaneAxialX = 0;
+constexpr std::int32_t TestBSPPlaneAxialZ = 2;
+constexpr std::int32_t TestBSPPlaneAnyX   = 3;
 
 //Entity text, terminator included. Its length is not a whole number of plane records, so a file whose layout is
 //mistaken for the other one is rejected.
@@ -138,6 +145,11 @@ public:
         Float(z);
     }
 
+    void Vector(const Vector3& vector)
+    {
+        Vector(vector.x, vector.y, vector.z);
+    }
+
     void Name(const char* szName, std::size_t size)
     {
         for (std::size_t i = 0; i < size; ++i)
@@ -177,10 +189,10 @@ inline BSPTestLumps MakeTestBSPLumps()
         CBSPWriter planes;
         planes.Vector(0, 0, 1);
         planes.Float(0);
-        planes.Int32(2);
+        planes.Int32(TestBSPPlaneAxialZ);
         planes.Vector(1, 0, 0);
         planes.Float(TestBSPSplitDistance);
-        planes.Int32(0);
+        planes.Int32(TestBSPPlaneAxialX);
         lumps[BSPPlaneLump] = std::move(planes.Bytes());
     }
 
