@@ -618,6 +618,31 @@ static bool SameVector(const Vector3& a, const Vector3& b)
     return a.x == b.x && a.y == b.y && a.z == b.z;
 }
 
+//The lightmap extent of a face without TEX_SPECIAL may reach 1024 texels, as SvEngine allows (GoldSrc allows 512), and
+//no more. The wall's texinfo stretches its s axis so that the quad spans the given extent.
+static void TestBSPSurfaceExtentLimit()
+{
+    using namespace GoldSrcRenderTest;
+
+    constexpr std::uint32_t maxSurfaceExtent = 1024;
+    constexpr std::uint32_t luxelSize        = 16;
+    const auto              bindings         = MakeTestBSPBindings(1);
+
+    for (const auto extent : {maxSurfaceExtent, maxSurfaceExtent + luxelSize})
+    {
+        auto       file          = MakeTestBSP();
+        const auto texInfoOffset = ReadBSPLumpOffset(file.data(), BSPTexInfoLump) + TestBSPWallSlot * TestBSPTexInfoBytes;
+        const auto sScale        = static_cast<float>(extent) / TestBSPQuadSize;
+
+        std::uint32_t bits;
+        std::memcpy(&bits, &sScale, sizeof(bits));
+        PatchUInt32(file, texInfoOffset, bits);
+
+        const auto expected = extent <= maxSurfaceExtent ? ErrorCode::None : ErrorCode::InvalidData;
+        Require(expected == ValidateBSPAsset(TestBSPAsset(file, bindings)), extent <= maxSurfaceExtent ? "accept an extent up to SvEngine's limit" : "reject an extent past SvEngine's limit");
+    }
+}
+
 //Every submodel has an entry per face of its range, in order; a drawn face names its surface and gives the lightmap
 //coordinates and frame of the surface's vertices exactly, so that what is drawn over it lines up with it.
 static void TestBSPFaces()
@@ -954,6 +979,7 @@ int main()
     TestBSPAnimatedTextures();
     TestBSPSubmodels();
     TestBSPCameraDistance();
+    TestBSPSurfaceExtentLimit();
     TestBSPFaces();
     TestBSPFaceFrames();
     TestBSPWaterSubdivision();
