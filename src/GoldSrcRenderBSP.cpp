@@ -56,7 +56,7 @@ constexpr std::int32_t  BSPTextureSpecial        = 1;
 constexpr std::uint32_t BSPMinFaceEdges          = 3;
 constexpr std::uint32_t BSPMissingTextureSize    = 16;
 constexpr std::uint32_t BSPLuxelSize             = 16;
-constexpr std::int32_t  BSPMaxSurfaceExtent      = 512;
+constexpr std::int32_t  BSPMaxSurfaceExtent      = 1024;
 constexpr std::uint32_t BSPLightmapBytesPerLuxel = RGBABytes;
 constexpr std::uint8_t  BSPOpaqueAlpha           = 255;
 constexpr std::uint32_t BSPVisibilityBitsPerByte = 8;
@@ -760,7 +760,8 @@ struct BSPFaceExtents
     }
 };
 
-//The face must have at least one edge. Faces without TEX_SPECIAL may not exceed BSPMaxSurfaceExtent.
+//The face must have at least one edge. Faces without TEX_SPECIAL may not exceed BSPMaxSurfaceExtent, the limit of
+//SvEngine; GoldSrc's limit of 512 is lower, so its maps stay valid.
 static ErrorCode ComputeFaceExtents(const BSPFileView& file, const BSPFace& face, const BSPTexInfo& texInfo, std::int32_t flags, BSPFaceExtents& extents)
 {
     float mins[BSPTextureAxes];
