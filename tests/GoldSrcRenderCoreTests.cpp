@@ -613,6 +613,32 @@ static void TestBSPCameraDistance()
     }
 }
 
+static void TestBSPEmptyDrawingHull()
+{
+    using namespace GoldSrcRenderTest;
+    const auto bindings = MakeTestBSPBindings(1);
+    auto       lumps    = MakeTestBSPLumps();
+    AddTestBSPSubmodel(lumps, TestBSPEmptyContents, 0);
+    BSPWorld world;
+    Require(ErrorCode::None == BuildBSPWorld(TestBSPAsset(AssembleTestBSP(lumps), bindings), world), "Build faceless inline model without a drawing tree");
+    Require(world.submodels.size() == 2 && world.submodels[1].faceCount == 0, "Keep the empty inline model's index");
+    auto       markedLumps = lumps;
+    CBSPWriter marker;
+    marker.Vector(std::numeric_limits<float>::quiet_NaN(), 0, 0);
+    marker.Vector(0, 0, 0);
+    constexpr float markerZ = 9999.0f;
+    marker.Vector(0, 0, markerZ);
+    marker.Bytes().resize(BSPModelBytes);
+    auto& models = markedLumps[BSPModelLump];
+    models.insert(models.end(), marker.Bytes().begin(), marker.Bytes().end());
+    Require(ErrorCode::None == BuildBSPWorld(TestBSPAsset(AssembleTestBSP(markedLumps), bindings), world), "Build world with trailing marker");
+    Require(world.submodels.size() == 3 && world.submodels.back().center.x == 0, "Keep marker slot with neutral bounds");
+    AddTestBSPSubmodel(markedLumps);
+    Require(ErrorCode::InvalidData == ValidateBSPAsset(TestBSPAsset(AssembleTestBSP(markedLumps), bindings)), "Only the last record may be a marker");
+    AddTestBSPSubmodel(lumps, TestBSPEmptyContents, TestBSPSubmodelFaceCount);
+    Require(ErrorCode::InvalidData == ValidateBSPAsset(TestBSPAsset(AssembleTestBSP(lumps), bindings)), "Reject faces without a drawing tree");
+}
+
 static bool SameVector(const Vector3& a, const Vector3& b)
 {
     return a.x == b.x && a.y == b.y && a.z == b.z;
@@ -980,6 +1006,7 @@ int main()
     TestBSPSubmodels();
     TestBSPCameraDistance();
     TestBSPSurfaceExtentLimit();
+    TestBSPEmptyDrawingHull();
     TestBSPFaces();
     TestBSPFaceFrames();
     TestBSPWaterSubdivision();

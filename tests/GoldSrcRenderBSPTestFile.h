@@ -388,18 +388,18 @@ inline BSPTestLumps MakeTestBSPLumps()
 }
 
 //Appends submodel 1, with the bounds of the quad, its own head node and no visible leaves.
-inline void AddTestBSPSubmodel(BSPTestLumps& lumps)
+inline void AddTestBSPSubmodel(BSPTestLumps& lumps, std::int32_t headNode = TestBSPSubmodelHeadNode, std::int32_t faceCount = TestBSPSubmodelFaceCount)
 {
     CBSPWriter model;
     model.Vector(0, 0, 0);
     model.Vector(TestBSPQuadSize, TestBSPQuadSize, 0);
     model.Vector(0, 0, 0);
-    model.Int32(TestBSPSubmodelHeadNode);
+    model.Int32(headNode);
     for (std::uint32_t i = 1; i < TestBSPModelHulls; ++i)
         model.Int32(0);
     model.Int32(0);
     model.Int32(TestBSPSubmodelFirstFace);
-    model.Int32(TestBSPSubmodelFaceCount);
+    model.Int32(faceCount);
 
     lumps[BSPModelLump].insert(lumps[BSPModelLump].end(), model.Bytes().begin(), model.Bytes().end());
 }

@@ -151,6 +151,21 @@ struct BSPFileView
     {
         return pFile + offsets[lump] + static_cast<std::size_t>(index) * recordBytes;
     }
+
+    const std::uint8_t* DrawingModel(std::uint32_t index) const
+    {
+        const auto* pModel = Record(BSPModelLump, index, BSPModelBytes);
+        //Some maps append a marker with data in mins.x and a tag in origin.z. It contributes no geometry.
+        constexpr float               markerZ   = 9999.0f;
+        constexpr auto                tagOffset = BSPModelHeadNodeOffset - sizeof(float);
+        static constexpr std::uint8_t empty[BSPModelBytes]{};
+        if (index != 0 && index + 1 == Count(BSPModelLump, BSPModelBytes) && ReadFloat(pModel, tagOffset) == markerZ &&
+            std::memcmp(pModel + sizeof(float), empty, tagOffset - sizeof(float)) == 0 &&
+            std::memcmp(pModel + BSPModelHeadNodeOffset, empty, BSPModelBytes - BSPModelHeadNodeOffset) == 0)
+            return empty;
+
+        return pModel;
+    }
 };
 
 static ErrorCode ReadBSPHeader(const std::uint8_t* pFile, std::uint32_t fileBytes, BSPLayout layout, BSPFileView& file)
@@ -860,7 +875,7 @@ static ErrorCode ValidateBSPModels(const BSPFileView& file, std::uint32_t& visib
 
     for (std::uint32_t i = 0; i < file.Count(BSPModelLump, BSPModelBytes); ++i)
     {
-        const auto* pModel = file.Record(BSPModelLump, i, BSPModelBytes);
+        const auto* pModel = file.DrawingModel(i);
 
         for (std::uint32_t axis = 0; axis < BSPAxes; ++axis)
         {
@@ -874,7 +889,9 @@ static ErrorCode ValidateBSPModels(const BSPFileView& file, std::uint32_t& visib
         const auto firstFace = ReadInt32(pModel, BSPModelFirstFaceOffset);
         const auto count     = ReadInt32(pModel, BSPModelFaceCountOffset);
 
-        if (headNode < 0 || static_cast<std::uint32_t>(headNode) >= nodeCount)
+        constexpr int contentsEmpty     = -1;
+        const bool    bEmptyDrawingHull = i != 0 && headNode == contentsEmpty && count == 0 && ReadInt32(pModel, BSPModelVisLeavesOffset) == 0;
+        if (!bEmptyDrawingHull && (headNode < 0 || static_cast<std::uint32_t>(headNode) >= nodeCount))
             return ErrorCode::InvalidData;
 
         if (firstFace < 0 || count < 0 || !ValidRange(faceCount, firstFace, count, 1))
@@ -1696,7 +1713,7 @@ ErrorCode BuildBSPWorld(const BSPAssetView& asset, BSPWorld& world)
 
     for (std::uint32_t index = 0; index < submodelCount; ++index)
     {
-        const auto*     pModel        = file.Record(BSPModelLump, index, BSPModelBytes);
+        const auto*     pModel        = file.DrawingModel(index);
         const auto      mins          = ReadVector(pModel, BSPModelMinsOffset);
         const auto      maxs          = ReadVector(pModel, BSPModelMaxsOffset);
         constexpr float s_HalfExtent  = 0.5f;
